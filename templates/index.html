@@ -1250,7 +1250,9 @@ function speak(text) {
   if (!ttsEnabled || !window.speechSynthesis) return;
   const utt = new SpeechSynthesisUtterance(_cleanForSpeech(text));
   utt.lang = 'de-DE';
-  utt.rate = 1.0;
+  utt.rate = 0.95;
+  const v = _bestDeVoice();
+  if (v) utt.voice = v;
   window.speechSynthesis.speak(utt);
 }
 
@@ -1283,11 +1285,9 @@ function speakMsg(btn) {
     const utt   = new SpeechSynthesisUtterance(text);
     utt.lang    = 'de-DE';
     utt.rate    = 0.95;
-    // Stimmen können asynchron geladen werden
     const trySpeak = () => {
-      const voices  = window.speechSynthesis.getVoices();
-      const deVoice = voices.find(v => v.lang.startsWith('de'));
-      if (deVoice) utt.voice = deVoice;
+      const v = _bestDeVoice();
+      if (v) utt.voice = v;
       utt.onend   = () => { btn.classList.remove('speaking'); btn.textContent = '🔊'; btn.title = 'Vorlesen'; };
       utt.onerror = () => { btn.classList.remove('speaking'); btn.textContent = '🔊'; };
       window.speechSynthesis.speak(utt);
@@ -1296,7 +1296,7 @@ function speakMsg(btn) {
       trySpeak();
     } else {
       window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.onvoiceschanged = null; trySpeak(); };
-      trySpeak(); // auch ohne Stimmen starten (Fallback-Stimme)
+      trySpeak();
     }
   };
 
