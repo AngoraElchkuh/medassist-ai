@@ -1,0 +1,2132 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedAssist AI – Medizinischer Ratgeber</title>
+<style>
+  :root {
+    --primary: #1565c0;
+    --primary-light: #e3f0ff;
+    --primary-dark: #0d3f7a;
+    --local: #6a1b9a;
+    --local-light: #f3e5f5;
+    --green: #2e7d32;
+    --orange: #e65100;
+    --red: #c62828;
+    --red-light: #ffebee;
+    --bg: #f4f6f9;
+    --surface: #ffffff;
+    --border: #dce3ec;
+    --text: #1a202c;
+    --muted: #64748b;
+    --shadow: 0 1px 6px rgba(0,0,0,0.10);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
+    --radius: 14px;
+    --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    background: linear-gradient(135deg, #1565c0 0%, #0d3f7a 100%);
+    color: white;
+    padding: 0 24px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 2px 10px rgba(13,63,122,.35);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  .logo {
+    width: 40px; height: 40px;
+    background: rgba(255,255,255,.18);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+
+  .header-title { font-size: 18px; font-weight: 700; }
+  .header-sub   { font-size: 11px; opacity: .75; margin-top: 1px; }
+
+  .header-right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 12px;
+  }
+
+  .online-pill {
+    background: rgba(255,255,255,.18);
+    border-radius: 20px;
+    padding: 4px 11px;
+    font-size: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .dot {
+    width: 7px; height: 7px;
+    background: #69f0ae;
+    border-radius: 50%;
+    animation: blink 2s infinite;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ─── MODEL SELECTOR BAR ─── */
+  #model-bar {
+    display: none;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 20px;
+    gap: 8px;
+    flex-shrink: 0;
+    align-items: center;
+  }
+  #model-bar.show { display: flex; }
+
+  .model-bar-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    margin-right: 4px;
+  }
+
+  .tab-btn {
+    padding: 6px 16px;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    background: var(--bg);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .18s;
+    font-family: var(--font);
+  }
+  .tab-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+  .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .tab-btn.active.local-tab { background: var(--local); border-color: var(--local); }
+  .tab-btn.active.cmp-tab {
+    background: linear-gradient(90deg, var(--primary), var(--local));
+    border-color: var(--local);
+  }
+
+  /* ─── LAYOUT ─── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    width: 270px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  .sblock {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sblock h3 {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .disclaimer {
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 11.5px;
+    color: #5d4037;
+    line-height: 1.5;
+  }
+
+  .disclaimer strong {
+    display: block;
+    color: var(--red);
+    margin-bottom: 3px;
+  }
+
+  .symptom-tag {
+    display: inline-block;
+    background: var(--primary-light);
+    color: var(--primary);
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    margin: 2px 2px 2px 0;
+    font-weight: 500;
+  }
+
+  .no-data {
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px; font-weight: 600;
+    background: #e8f5e9; color: var(--green);
+  }
+
+  .status-badge.analyzing { background: var(--primary-light); color: var(--primary); }
+  .status-badge.emergency { background: var(--red-light); color: var(--red); }
+
+  .emergency-card {
+    background: var(--red-light);
+    border: 1px solid #ef9a9a;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--red);
+    margin-top: 6px;
+  }
+  .emergency-card strong { display: block; font-size: 14px; margin-bottom: 2px; }
+
+  .info-card {
+    background: var(--primary-light);
+    border: 1px solid #90caf9;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--primary);
+    margin-top: 6px;
+  }
+  .info-card strong { display: block; font-size: 14px; margin-bottom: 2px; }
+
+  .regional-card {
+    background: #e8f5e9;
+    border: 1px solid #a5d6a7;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: #2e7d32;
+    margin-top: 6px;
+  }
+  .regional-card strong { display: block; font-size: 14px; margin-bottom: 2px; }
+
+  /* Location tag */
+  .loc-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 500; color: var(--muted);
+    cursor: pointer; padding: 2px 6px;
+    border-radius: 10px; background: var(--bg);
+    border: 1px solid var(--border);
+    vertical-align: middle; margin-left: 6px;
+    transition: background .15s;
+  }
+  .loc-tag:hover { background: var(--primary-light); color: var(--primary); }
+
+  /* GP Card */
+  .gp-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    margin: 0 16px 8px;
+  }
+  .gp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .gp-header strong { font-size: 14px; color: var(--text); }
+  .gp-edit-btn { background: none; border: none; cursor: pointer; font-size: 14px; color: var(--muted); padding: 2px 5px; border-radius: 4px; }
+  .gp-edit-btn:hover { background: var(--bg); color: var(--primary); }
+  .gp-detail { color: var(--muted); font-size: 12px; margin-top: 3px; }
+  .gp-phone { display: block; margin-top: 6px; color: var(--green); font-weight: 600; font-size: 13px; text-decoration: none; }
+  .gp-phone:hover { text-decoration: underline; }
+  .gp-maps { display: inline-block; margin-top: 7px; font-size: 11px; color: var(--primary); text-decoration: none; }
+  .gp-maps:hover { text-decoration: underline; }
+  .gp-add-btn {
+    display: block; margin: 0 16px 8px;
+    padding: 9px 0; background: var(--bg);
+    color: var(--muted); border: 1px dashed var(--border);
+    border-radius: 8px; cursor: pointer; font-size: 13px;
+    width: calc(100% - 32px); text-align: center;
+    transition: all .15s;
+  }
+  .gp-add-btn:hover { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
+
+  /* Modal select & label */
+  .modal label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .5px; }
+  .modal select {
+    width: 100%; padding: 9px 12px;
+    border: 2px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: var(--font);
+    outline: none; background: white; cursor: pointer;
+    transition: border-color .2s;
+  }
+  .modal select:focus { border-color: var(--primary); }
+
+  .new-session-btn {
+    margin: 14px 16px;
+    padding: 9px 0;
+    background: var(--primary);
+    color: white;
+    border: none; border-radius: 8px;
+    cursor: pointer; font-size: 13.5px; font-weight: 500;
+    transition: background .2s;
+    width: calc(100% - 32px);
+  }
+
+  .new-session-btn:hover { background: var(--primary-dark); }
+
+  /* ─── CHAT AREA ─── */
+  .chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  /* Emergency banner */
+  #emergency-banner {
+    display: none;
+    background: var(--red);
+    color: white;
+    text-align: center;
+    padding: 10px 16px;
+    font-weight: 700;
+    font-size: 14px;
+    animation: flashRed 1s infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes flashRed { 0%,100%{background:#c62828} 50%{background:#e53935} }
+
+  /* Messages */
+  #msgs {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* ─── COMPARE MODE ─── */
+  #msgs-compare {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: none;
+    flex-direction: column;
+    gap: 18px;
+  }
+  #msgs-compare.show { display: flex; }
+
+  .cmp-turn { display: flex; flex-direction: column; gap: 10px; }
+
+  .cmp-user {
+    align-self: flex-end;
+    max-width: 70%;
+    background: linear-gradient(135deg,#1565c0,#0d3f7a);
+    color: white;
+    border-radius: var(--radius);
+    border-bottom-right-radius: 4px;
+    padding: 10px 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    box-shadow: var(--shadow);
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .cmp-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .cmp-col {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .cmp-col-hdr {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    align-self: flex-start;
+  }
+
+  .cmp-col.cloud .cmp-col-hdr {
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+
+  .cmp-col.local .cmp-col-hdr {
+    background: var(--local-light);
+    color: var(--local);
+  }
+
+  .cmp-col .bubble {
+    border-radius: var(--radius);
+    border-top-left-radius: 4px;
+  }
+
+  .cmp-col.local .bubble {
+    border-color: var(--local-light);
+    border: 1.5px solid var(--local-light);
+  }
+
+  /* ─── SINGLE MESSAGES ─── */
+  .msg {
+    display: flex;
+    gap: 10px;
+    animation: fadeUp .25s ease;
+  }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  .msg.user {
+    flex-direction: row-reverse;
+    align-self: flex-end;
+    max-width: 78%;
+  }
+
+  .msg.assistant {
+    align-self: flex-start;
+    max-width: 82%;
+  }
+
+  .avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    flex-shrink: 0;
+    align-self: flex-end;
+  }
+
+  .msg.assistant .avatar { background: linear-gradient(135deg,#1565c0,#0d3f7a); }
+  .msg.user      .avatar { background: linear-gradient(135deg,#2e7d32,#1b5e20); }
+  .msg.local-assistant .avatar { background: linear-gradient(135deg,#6a1b9a,#4a148c); }
+
+  .bubble {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border-bottom-left-radius: 4px;
+    padding: 11px 15px;
+    box-shadow: var(--shadow);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .msg.user .bubble {
+    background: linear-gradient(135deg,#1565c0,#0d3f7a);
+    color: white;
+    border-radius: var(--radius);
+    border-bottom-right-radius: 4px;
+  }
+
+  .bubble strong { font-weight: 600; }
+  .bubble em     { font-style: italic; }
+
+  .bubble ul, .bubble ol { padding-left: 18px; margin: 6px 0; }
+  .bubble li { margin: 3px 0; }
+
+  /* Diagnosis block inside bubble */
+  .diag-block {
+    background: #f0f7ff;
+    border: 1.5px solid var(--primary);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 10px 0 4px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12.5px;
+    white-space: pre-wrap;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  .emerg-text {
+    background: var(--red-light);
+    border-left: 4px solid var(--red);
+    padding: 8px 11px;
+    border-radius: 0 8px 8px 0;
+    margin: 8px 0;
+    color: var(--red);
+    font-weight: 600;
+  }
+
+  .msg-time {
+    font-size: 10.5px;
+    color: var(--muted);
+    margin-top: 4px;
+    padding: 0 2px;
+  }
+
+  .msg.user .msg-time { text-align: right; color: rgba(255,255,255,.55); }
+
+  /* Typing indicator */
+  .typing { display: flex; gap: 4px; padding: 4px 0; align-items: center; }
+  .tdot {
+    width: 7px; height: 7px;
+    background: var(--primary);
+    border-radius: 50%;
+    animation: tdot 1.3s ease-in-out infinite;
+  }
+  .tdot:nth-child(2){ animation-delay:.2s }
+  .tdot:nth-child(3){ animation-delay:.4s }
+  @keyframes tdot { 0%,100%{transform:translateY(0);opacity:.4} 50%{transform:translateY(-5px);opacity:1} }
+
+  /* Cursor */
+  .cursor {
+    display: inline-block;
+    animation: cur .9s infinite;
+    color: var(--primary);
+    font-weight: 700;
+  }
+  @keyframes cur { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+
+  /* ─── INPUT AREA ─── */
+  .input-area {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 20px 14px;
+    flex-shrink: 0;
+  }
+
+  #voice-status-bar {
+    display: none;
+    background: #fce4ec;
+    border: 1px solid #f48fb1;
+    border-radius: 8px;
+    padding: 7px 12px;
+    margin-bottom: 9px;
+    font-size: 13px;
+    color: var(--red);
+    gap: 7px;
+    align-items: center;
+  }
+
+  #voice-status-bar.show { display: flex; }
+
+  .input-box {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    padding: 8px 10px;
+    transition: border-color .2s;
+  }
+
+  .input-box:focus-within { border-color: var(--primary); }
+
+  #msg-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-family: var(--font);
+    resize: none;
+    outline: none;
+    max-height: 110px;
+    min-height: 38px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  #msg-input::placeholder { color: var(--muted); }
+
+  .ibtn {
+    width: 36px; height: 36px;
+    border-radius: 9px;
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    transition: all .2s;
+    flex-shrink: 0;
+  }
+
+  #voice-btn {
+    background: var(--bg);
+    color: var(--muted);
+  }
+  #voice-btn:hover { background: var(--primary-light); color: var(--primary); }
+  #voice-btn.rec   { background: var(--red); color: white; animation: recPulse 1s infinite; }
+  @keyframes recPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+
+  #send-btn {
+    background: var(--primary);
+    color: white;
+  }
+  #send-btn:hover:not(:disabled) { background: var(--primary-dark); transform: scale(1.05); }
+  #send-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; transform: none; }
+
+  #tts-btn {
+    background: var(--bg);
+    color: var(--muted);
+  }
+  #tts-btn:hover { background: var(--primary-light); color: var(--primary); }
+  #tts-btn.active { background: var(--primary-light); color: var(--primary); }
+
+  .input-hint {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 7px;
+  }
+
+  /* ─── SIDEBAR EXTRA BUTTONS ─── */
+  .save-btn {
+    margin: 0 16px 8px;
+    padding: 9px 0;
+    background: #2e7d32;
+    color: white;
+    border: none; border-radius: 8px;
+    cursor: pointer; font-size: 13.5px; font-weight: 500;
+    transition: background .2s;
+    width: calc(100% - 32px);
+  }
+  .save-btn:hover { background: #1b5e20; }
+
+  .records-btn {
+    margin: 0 16px 14px;
+    padding: 9px 0;
+    background: #f57c00;
+    color: white;
+    border: none; border-radius: 8px;
+    cursor: pointer; font-size: 13.5px; font-weight: 500;
+    transition: background .2s;
+    width: calc(100% - 32px);
+  }
+  .records-btn:hover { background: #e65100; }
+
+  /* ─── MODALS ─── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.50);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 24px;
+    width: 460px;
+    max-width: 95vw;
+    max-height: 82vh;
+    overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0,0,0,.25);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .modal h2 { font-size: 17px; font-weight: 700; }
+
+  .modal input[type="text"] {
+    width: 100%;
+    padding: 9px 12px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: var(--font);
+    outline: none;
+    transition: border-color .2s;
+  }
+  .modal input[type="text"]:focus { border-color: var(--primary); }
+
+  .modal-hint { font-size: 12px; color: var(--muted); margin-top: -8px; }
+
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  .mbtn {
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 13.5px; font-weight: 500;
+    transition: background .2s;
+  }
+  .mbtn-primary { background: var(--primary); color: white; }
+  .mbtn-primary:hover { background: var(--primary-dark); }
+  .mbtn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+  .mbtn-secondary:hover { background: var(--border); }
+  .mbtn-danger { background: var(--red); color: white; }
+  .mbtn-danger:hover { background: #b71c1c; }
+
+  #save-status { font-size: 13px; min-height: 18px; }
+  #save-status.ok  { color: var(--green); }
+  #save-status.err { color: var(--red); }
+
+  /* Patient / Chat list in records modal */
+  .patient-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .patient-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: background .15s;
+  }
+  .patient-header:hover { background: var(--primary-light); }
+
+  .patient-name { font-weight: 600; font-size: 14px; flex: 1; }
+  .patient-count { font-size: 12px; color: var(--muted); }
+  .patient-chevron { font-size: 11px; color: var(--muted); transition: transform .2s; }
+  .patient-card.open .patient-chevron { transform: rotate(90deg); }
+
+  .chat-list { display: none; border-top: 1px solid var(--border); }
+  .patient-card.open .chat-list { display: block; }
+
+  .chat-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 14px;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .chat-row:last-child { border-bottom: none; }
+
+  .chat-label { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-date  { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
+  .chat-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .icon-btn {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    transition: background .15s;
+  }
+  .icon-btn.load   { background: var(--primary-light); }
+  .icon-btn.load:hover   { background: #c5dcff; }
+  .icon-btn.del    { background: #ffebee; }
+  .icon-btn.del:hover    { background: #ffcdd2; }
+
+  /* Read-only banner */
+  #readonly-banner {
+    display: none;
+    background: #fff8e1;
+    border-bottom: 1px solid #ffe082;
+    padding: 8px 20px;
+    font-size: 13px;
+    color: #5d4037;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  #readonly-banner button {
+    margin-left: 12px;
+    padding: 3px 10px;
+    background: #fff;
+    border: 1px solid #ffe082;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  /* ─── AUTO-HISTORY LIST ─── */
+  .ah-entry {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-bottom: 7px;
+    background: var(--bg);
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .ah-entry:hover { background: var(--primary-light); }
+  .ah-model-badge {
+    font-size: 11px; font-weight: 700;
+    padding: 2px 7px; border-radius: 10px;
+    flex-shrink: 0;
+  }
+  .ah-model-badge.cloud { background: var(--primary-light); color: var(--primary); }
+  .ah-model-badge.local { background: var(--local-light); color: var(--local); }
+  .ah-label { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ah-date  { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .ah-del   { background: none; border: none; cursor: pointer; font-size: 14px; opacity: .5; flex-shrink: 0; }
+  .ah-del:hover { opacity: 1; }
+
+  /* ─── COMPARE MODE INFO ─── */
+  #cmp-info-bar {
+    display: none;
+    background: linear-gradient(90deg, var(--primary-light), var(--local-light));
+    border-bottom: 1px solid var(--border);
+    padding: 7px 20px;
+    font-size: 12px;
+    color: var(--muted);
+    flex-shrink: 0;
+    align-items: center;
+    gap: 16px;
+  }
+  #cmp-info-bar.show { display: flex; }
+  .cmp-legend { display: flex; align-items: center; gap: 5px; font-weight: 600; }
+  .cmp-legend-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .cmp-legend-dot.cloud { background: var(--primary); }
+  .cmp-legend-dot.local { background: var(--local); }
+
+  /* ─── SCROLLBAR ─── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #b0bec5; }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 700px) {
+    .sidebar { display: none; }
+    .msg.user, .msg.assistant { max-width: 96%; }
+    .cmp-cols { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">🏥</div>
+  <div>
+    <div class="header-title">MedAssist AI</div>
+    <div class="header-sub" id="header-sub">KI-gestützter Medizinischer Ratgeber</div>
+  </div>
+  <div class="header-right">
+    <div class="online-pill"><div class="dot"></div> <span id="header-mode-pill">Online</span></div>
+  </div>
+</header>
+
+<!-- MODEL SELECTOR BAR (only visible in "both" mode) -->
+<div id="model-bar">
+  <span class="model-bar-label">Modell:</span>
+  <button class="tab-btn active" id="tab-cloud" onclick="setChatMode('cloud')">☁️ Cloud (Claude)</button>
+  <button class="tab-btn local-tab" id="tab-local" onclick="setChatMode('local')">💻 Lokal (Ollama)</button>
+  <button class="tab-btn cmp-tab" id="tab-compare" onclick="setChatMode('compare')">⚡ Vergleich</button>
+</div>
+
+<!-- COMPARE INFO BAR -->
+<div id="cmp-info-bar">
+  <div class="cmp-legend"><div class="cmp-legend-dot cloud"></div> ☁️ Cloud – Claude Opus</div>
+  <div class="cmp-legend"><div class="cmp-legend-dot local"></div> 💻 Lokal – Ollama</div>
+  <span style="margin-left:auto;font-style:italic">Beide Modelle antworten parallel</span>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div class="sblock">
+      <h3>Hinweis</h3>
+      <div class="disclaimer">
+        <strong>⚠️ Wichtiger Hinweis</strong>
+        Dieses System ist ein KI-Ratgeber und ersetzt <strong>keine</strong> ärztliche Untersuchung.
+        Bei lebensbedrohlichen Symptomen sofort <strong>112</strong> rufen.
+      </div>
+    </div>
+
+    <div class="sblock">
+      <h3>Diagnose-Status</h3>
+      <div id="diag-status">
+        <div class="status-badge analyzing" id="status-badge">🔍 Anamnese läuft...</div>
+      </div>
+    </div>
+
+    <div class="sblock">
+      <h3>Erfasste Symptome</h3>
+      <div id="symptom-list">
+        <div class="no-data">Noch keine Symptome erfasst</div>
+      </div>
+    </div>
+
+    <div class="sblock">
+      <h3 id="emergency-h3">Notfallnummern <span class="loc-tag" onclick="openLocationModal()" title="Standort ändern">📍 … ✎</span></h3>
+      <div id="emergency-numbers-list">
+        <!-- dynamisch befüllt -->
+      </div>
+    </div>
+
+    <div class="sblock">
+      <h3>🩺 Mein Hausarzt</h3>
+      <div id="hausarzt-section"><!-- dynamisch --></div>
+    </div>
+
+    <button class="new-session-btn" onclick="newSession()">🔄 Neue Sitzung starten</button>
+    <button class="save-btn" onclick="openSaveModal()">💾 Sitzung speichern</button>
+    <button class="records-btn" onclick="openPatientsModal()">📂 Patienten öffnen</button>
+    <button class="records-btn" style="background:var(--primary-light);color:var(--primary)" onclick="openAutoHistoryModal()">🕐 Letzte Diagnosen</button>
+
+  </aside>
+
+  <!-- CHAT AREA -->
+  <div class="chat-area">
+
+    <div id="readonly-banner">
+      📂 Archivierte Sitzung — Schreibgeschützt
+      <button onclick="newSession()">Neue Sitzung starten</button>
+    </div>
+
+    <div id="emergency-banner">
+      🚨 NOTFALL erkannt — Rufen Sie sofort den Notruf: 112 🚨
+    </div>
+
+    <!-- Single-model chat -->
+    <div id="msgs"></div>
+
+    <!-- Compare mode chat -->
+    <div id="msgs-compare"></div>
+
+    <!-- INPUT -->
+    <div class="input-area">
+      <div id="voice-status-bar">
+        <span>🎤</span> Aufnahme läuft — sprechen Sie Ihre Beschwerden...
+      </div>
+
+      <div class="input-box">
+        <textarea id="msg-input"
+          placeholder="Beschwerden beschreiben... (z.B. 'Ich habe seit gestern starke Kopfschmerzen links')"
+          rows="1"
+          onkeydown="onKey(event)"
+          oninput="autoResize(this)"
+        ></textarea>
+        <div style="display:flex;gap:6px;align-items:flex-end">
+          <button class="ibtn" id="tts-btn" onclick="toggleTTS()" title="Sprachausgabe an/aus">🔊</button>
+          <button class="ibtn" id="voice-btn" onclick="toggleVoice()" title="Spracheingabe">🎤</button>
+          <button class="ibtn" id="send-btn" onclick="onSend()" title="Senden">➤</button>
+        </div>
+      </div>
+
+      <div class="input-hint" id="input-hint">Enter = Senden &nbsp;|&nbsp; Shift+Enter = Neue Zeile &nbsp;|&nbsp; 🎤 = Spracheingabe &nbsp;|&nbsp; 🔊 = Vorlesen</div>
+    </div>
+
+  </div><!-- /chat-area -->
+</div><!-- /layout -->
+
+<!-- SAVE MODAL -->
+<div class="modal-overlay" id="modal-save">
+  <div class="modal">
+    <h2>💾 Sitzung speichern</h2>
+    <p class="modal-hint">Geben Sie einen Patientennamen ein. Bestehende Patienten werden automatisch erkannt.</p>
+    <input type="text" id="save-name-input" placeholder="z.B. Max Mustermann"
+           list="patients-datalist" oninput="onSaveNameInput()" autocomplete="off">
+    <datalist id="patients-datalist"></datalist>
+    <div id="save-status"></div>
+    <div class="modal-actions">
+      <button class="mbtn mbtn-secondary" onclick="closeModals()">Abbrechen</button>
+      <button class="mbtn mbtn-primary" onclick="doSave()">💾 Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECORDS MODAL -->
+<div class="modal-overlay" id="modal-patients">
+  <div class="modal" style="width:540px">
+    <h2>📂 Patientenakten</h2>
+    <div id="patients-list-container">
+      <div class="no-data">Lade...</div>
+    </div>
+    <div class="modal-actions">
+      <button class="mbtn mbtn-secondary" onclick="closeModals()">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- AUTO-HISTORY MODAL -->
+<div class="modal-overlay" id="modal-auto-history">
+  <div class="modal" style="width:560px">
+    <h2>🕐 Letzte Diagnosen <span style="font-size:13px;font-weight:400;color:var(--muted)">(automatisch gespeichert)</span></h2>
+    <div id="auto-history-container">
+      <div class="no-data">Lade...</div>
+    </div>
+    <div class="modal-actions">
+      <button class="mbtn mbtn-secondary" onclick="closeModals()">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOCATION MODAL -->
+<div class="modal-overlay" id="modal-location">
+  <div class="modal" style="width:400px">
+    <h2>📍 Standort / Land</h2>
+    <p class="modal-hint">Standort wird nur lokal gespeichert – keine Daten werden übertragen.</p>
+    <label>Land</label>
+    <select id="loc-country" onchange="updateRegionDropdown()">
+      <option value="DE">🇩🇪 Deutschland</option>
+      <option value="AT">🇦🇹 Österreich</option>
+      <option value="CH">🇨🇭 Schweiz</option>
+    </select>
+    <label>Bundesland / Kanton</label>
+    <select id="loc-region"></select>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="mbtn mbtn-secondary" onclick="closeModals()">Abbrechen</button>
+      <button class="mbtn mbtn-primary" onclick="saveLocationManual()">✔ Übernehmen</button>
+    </div>
+  </div>
+</div>
+
+<!-- HAUSARZT MODAL -->
+<div class="modal-overlay" id="modal-hausarzt">
+  <div class="modal" style="width:420px">
+    <h2>🩺 Hausarzt speichern</h2>
+    <label>Name *</label>
+    <input type="text" id="gp-name" placeholder="Dr. Max Mustermann">
+    <label>Fachgebiet</label>
+    <input type="text" id="gp-specialty" placeholder="Allgemeinmedizin">
+    <label>Telefon</label>
+    <input type="text" id="gp-phone" placeholder="089 123 456 78">
+    <label>Adresse</label>
+    <input type="text" id="gp-address" placeholder="Musterstraße 1, 80333 München">
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="mbtn mbtn-danger" onclick="deleteHausarzt()" id="gp-del-btn">🗑 Löschen</button>
+      <button class="mbtn mbtn-secondary" onclick="closeModals()">Abbrechen</button>
+      <button class="mbtn mbtn-primary" onclick="saveHausarzt()">💾 Speichern</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────
+let sessionId  = localStorage.getItem('med_sid')  || uid();
+let sessionIdL = localStorage.getItem('med_sid_l') || uid();  // local session for compare
+localStorage.setItem('med_sid',   sessionId);
+localStorage.setItem('med_sid_l', sessionIdL);
+
+let appMode   = 'cloud';   // "cloud" | "local" | "both"  — from /api/config
+let chatMode  = 'cloud';   // "cloud" | "local" | "compare"
+
+let isReadOnly  = false;
+let isRecording = false;
+let recognition  = null;
+let ttsEnabled   = false;
+
+// ─── INIT ────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  initSTT();
+  await loadConfig();
+  greet();
+  detectLocation();
+  renderHausarzt();
+});
+
+function uid() {
+  return 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+// ─── CONFIG ──────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/config');
+    if (!r.ok) return;
+    const cfg = await r.json();
+    appMode = cfg.mode || 'cloud';
+  } catch(_) {
+    appMode = 'cloud';
+  }
+  applyAppMode();
+}
+
+function applyAppMode() {
+  const bar = document.getElementById('model-bar');
+
+  if (appMode === 'both') {
+    bar.classList.add('show');
+    document.getElementById('header-sub').textContent = 'KI-gestützter Medizinischer Ratgeber · Cloud + Lokal';
+  } else {
+    bar.classList.remove('show');
+    const sub = appMode === 'local'
+      ? 'KI-gestützter Medizinischer Ratgeber · Lokal (Ollama)'
+      : 'KI-gestützter Medizinischer Ratgeber · Powered by Claude Opus';
+    document.getElementById('header-sub').textContent = sub;
+    document.getElementById('header-mode-pill').textContent = appMode === 'local' ? '💻 Lokal' : 'Online';
+    // Default chat mode matches app mode
+    chatMode = appMode;
+  }
+}
+
+// ─── SET CHAT MODE (only relevant in "both" appMode) ─────
+function setChatMode(mode) {
+  chatMode = mode;
+
+  // Update tab buttons
+  document.getElementById('tab-cloud').classList.toggle('active', mode === 'cloud');
+  document.getElementById('tab-local').classList.toggle('active', mode === 'local');
+  document.getElementById('tab-compare').classList.toggle('active', mode === 'compare');
+
+  // Show/hide chat areas
+  const msgs    = document.getElementById('msgs');
+  const msgsCmp = document.getElementById('msgs-compare');
+  const cmpInfo = document.getElementById('cmp-info-bar');
+
+  if (mode === 'compare') {
+    msgs.style.display    = 'none';
+    msgsCmp.classList.add('show');
+    cmpInfo.classList.add('show');
+    document.getElementById('msg-input').placeholder = 'Beschwerden schildern — beide Modelle antworten parallel...';
+  } else {
+    msgs.style.display    = '';
+    msgsCmp.classList.remove('show');
+    cmpInfo.classList.remove('show');
+    document.getElementById('msg-input').placeholder = 'Beschwerden beschreiben...';
+  }
+}
+
+// ─── GREETING ────────────────────────────────────────────
+function greet() {
+  if (chatMode === 'compare') {
+    addCompareTurn(
+      null,
+      `Guten Tag! Ich bin **MedAssist AI** – Ihr Cloud-KI-Medizinberater. 👨‍⚕️\n\nSchildern Sie Ihre Beschwerden — ich und das lokale Modell antworten parallel, damit Sie die Antworten vergleichen können.\n\n⚠️ *Bei lebensbedrohlichen Symptomen sofort **112** rufen.*`,
+      `Hallo! Ich bin das lokale MedAssist-Modell. 🏥\n\nSchildern Sie mir Ihre Beschwerden. Meine Antwort erscheint neben der des Cloud-Modells für einen direkten Vergleich.\n\n⚠️ *Notruf: **112***`,
+      true
+    );
+  } else {
+    const text =
+      `Guten Tag! Ich bin **MedAssist AI** – Ihr persönlicher KI-Medizinberater. 👨‍⚕️\n\n` +
+      `Ich verfüge über das medizinische Fachwissen eines erfahrenen Allgemeinmediziners und helfe Ihnen dabei, Ihre Beschwerden einzuschätzen.\n\n` +
+      `**So funktioniert es:**\n` +
+      `• Schildern Sie mir Ihre Beschwerden (Schreiben oder Sprechen per 🎤)\n` +
+      `• Ich stelle gezielte Nachfragen zur Eingrenzung der Diagnose\n` +
+      `• Sie erhalten eine fundierte Diagnose mit Handlungsempfehlungen\n\n` +
+      `⚠️ *Bei lebensbedrohlichen Symptomen rufen Sie sofort **112** an.*\n\n` +
+      `**Wo drückt der Schuh? Schildern Sie mir Ihre Beschwerden.**`;
+    addMsg('assistant', text);
+  }
+}
+
+// ─── SPEECH-TO-TEXT ──────────────────────────────────────
+function initSTT() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { document.getElementById('voice-btn').style.display = 'none'; return; }
+
+  recognition = new SR();
+  recognition.lang = 'de-DE';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  recognition.onresult = e => {
+    let t = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
+    const el = document.getElementById('msg-input');
+    el.value = t;
+    autoResize(el);
+  };
+
+  recognition.onend = () => {
+    stopRec();
+    const el = document.getElementById('msg-input');
+    if (el.value.trim()) onSend();
+  };
+
+  recognition.onerror = () => stopRec();
+}
+
+function toggleVoice() {
+  if (!recognition) return;
+  if (isRecording) { recognition.stop(); stopRec(); }
+  else { startRec(); try { recognition.start(); } catch(e){ stopRec(); } }
+}
+
+function startRec() {
+  isRecording = true;
+  const b = document.getElementById('voice-btn');
+  b.classList.add('rec'); b.textContent = '⏹';
+  document.getElementById('voice-status-bar').classList.add('show');
+}
+
+function stopRec() {
+  isRecording = false;
+  const b = document.getElementById('voice-btn');
+  b.classList.remove('rec'); b.textContent = '🎤';
+  document.getElementById('voice-status-bar').classList.remove('show');
+}
+
+// ─── TEXT-TO-SPEECH ──────────────────────────────────────
+function toggleTTS() {
+  ttsEnabled = !ttsEnabled;
+  const b = document.getElementById('tts-btn');
+  if (ttsEnabled) { b.classList.add('active'); b.title = 'Sprachausgabe deaktivieren'; }
+  else            { b.classList.remove('active'); b.title = 'Sprachausgabe aktivieren'; window.speechSynthesis.cancel(); }
+}
+
+function speak(text) {
+  if (!ttsEnabled || !window.speechSynthesis) return;
+  const clean = text.replace(/[╔╚║╝═━▸□✓•🔍📌🔄💊⚠️🔴🚨📞ℹ️]/g, '')
+                    .replace(/\*\*/g,'').replace(/\*/g,'')
+                    .replace(/<[^>]*>/g,'')
+                    .replace(/\n+/g,' ')
+                    .trim()
+                    .substring(0, 500);
+  const utt = new SpeechSynthesisUtterance(clean);
+  utt.lang = 'de-DE';
+  utt.rate = 1.0;
+  window.speechSynthesis.speak(utt);
+}
+
+// ─── INPUT HELPERS ───────────────────────────────────────
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 110) + 'px';
+}
+
+function onKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); }
+}
+
+function onSend() {
+  if (chatMode === 'compare') sendMsgCompare();
+  else sendMsg();
+}
+
+// ─── SEND MESSAGE (single model) ─────────────────────────
+async function sendMsg() {
+  if (isReadOnly) return;
+  const inp  = document.getElementById('msg-input');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  inp.value = ''; autoResize(inp);
+  document.getElementById('send-btn').disabled = true;
+
+  addMsg('user', text);
+  checkEmergency(text);
+
+  const typId = showTyping();
+
+  // Determine which model to request
+  const model = (appMode === 'both') ? chatMode : appMode;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ message: text, session_id: sessionId, model })
+    });
+
+    removeTyping(typId);
+
+    if (!res.ok) throw new Error('Serverfehler ' + res.status);
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    const msgDiv  = startStream(model);
+    let full = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = decoder.decode(value).split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const d = JSON.parse(line.slice(6));
+          if (d.text) { full += d.text; updateStream(msgDiv, full); }
+          if (d.done)  { finalStream(msgDiv, full); speak(full); updateSidebar(full); }
+          if (d.error) { finalStream(msgDiv, '❌ ' + d.error); }
+        } catch(_){}
+      }
+    }
+
+  } catch(err) {
+    removeTyping(typId);
+    addMsg('assistant', '❌ Verbindungsfehler. Bitte Seite neu laden und erneut versuchen.');
+  }
+
+  document.getElementById('send-btn').disabled = false;
+}
+
+// ─── SEND MESSAGE (compare mode) ─────────────────────────
+async function sendMsgCompare() {
+  if (isReadOnly) return;
+  const inp  = document.getElementById('msg-input');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  inp.value = ''; autoResize(inp);
+  document.getElementById('send-btn').disabled = true;
+
+  checkEmergency(text);
+
+  // Create a new compare turn with the user message and two streaming bubbles
+  const { cloudBubble, localBubble } = addCompareTurnStreaming(text);
+
+  let cloudFull = '';
+  let localFull = '';
+
+  try {
+    const res = await fetch('/api/chat/compare', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({
+        message: text,
+        cloud_session_id: sessionId,
+        local_session_id: sessionIdL
+      })
+    });
+
+    if (!res.ok) throw new Error('Serverfehler ' + res.status);
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = decoder.decode(value).split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const d = JSON.parse(line.slice(6));
+          if (d.source === 'cloud') {
+            if (d.text)  { cloudFull += d.text; updateStream(cloudBubble, cloudFull); }
+            if (d.done)  { finalStream(cloudBubble, cloudFull); updateSidebar(cloudFull); }
+            if (d.error) { finalStream(cloudBubble, '❌ ' + d.error); }
+          } else if (d.source === 'local') {
+            if (d.text)  { localFull += d.text; updateStream(localBubble, localFull); }
+            if (d.done)  { finalStream(localBubble, localFull); }
+            if (d.error) { finalStream(localBubble, '❌ ' + d.error); }
+          }
+        } catch(_){}
+      }
+    }
+
+  } catch(err) {
+    finalStream(cloudBubble, '❌ Verbindungsfehler.');
+    finalStream(localBubble, '❌ Verbindungsfehler.');
+  }
+
+  document.getElementById('send-btn').disabled = false;
+}
+
+// ─── RENDER ──────────────────────────────────────────────
+function addMsg(role, content) {
+  const c   = document.getElementById('msgs');
+  const t   = now();
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+
+  const av = role === 'assistant'
+    ? (chatMode === 'local' ? '🖥️' : '👨‍⚕️')
+    : '👤';
+
+  div.innerHTML = `
+    <div class="avatar">${av}</div>
+    <div>
+      <div class="bubble">${fmt(content)}</div>
+      <div class="msg-time">${t}</div>
+    </div>`;
+
+  c.appendChild(div);
+  scrollMsgs();
+  return div;
+}
+
+/** Add a complete compare turn (both sides already have content — used for greet) */
+function addCompareTurn(userText, cloudText, localText, isGreeting = false) {
+  const c   = document.getElementById('msgs-compare');
+  const div = document.createElement('div');
+  div.className = 'cmp-turn';
+
+  const userHtml = isGreeting ? '' : `
+    <div class="cmp-user">
+      <span>👤</span>
+      <span>${escHtml(userText)}</span>
+    </div>`;
+
+  div.innerHTML = `${userHtml}
+    <div class="cmp-cols">
+      <div class="cmp-col cloud">
+        <div class="cmp-col-hdr">☁️ Cloud – Claude</div>
+        <div class="bubble">${fmt(cloudText)}</div>
+      </div>
+      <div class="cmp-col local">
+        <div class="cmp-col-hdr">💻 Lokal – Ollama</div>
+        <div class="bubble">${fmt(localText)}</div>
+      </div>
+    </div>`;
+
+  c.appendChild(div);
+  scrollCompare();
+}
+
+/** Add a streaming compare turn — returns the two bubble elements */
+function addCompareTurnStreaming(userText) {
+  const c   = document.getElementById('msgs-compare');
+  const div = document.createElement('div');
+  div.className = 'cmp-turn';
+
+  div.innerHTML = `
+    <div class="cmp-user">
+      <span>👤</span>
+      <span>${escHtml(userText)}</span>
+    </div>
+    <div class="cmp-cols">
+      <div class="cmp-col cloud">
+        <div class="cmp-col-hdr">☁️ Cloud – Claude</div>
+        <div class="bubble cloud-bubble"><span class="cursor">▌</span></div>
+      </div>
+      <div class="cmp-col local">
+        <div class="cmp-col-hdr">💻 Lokal – Ollama</div>
+        <div class="bubble local-bubble"><span class="cursor">▌</span></div>
+      </div>
+    </div>`;
+
+  c.appendChild(div);
+  scrollCompare();
+
+  return {
+    cloudBubble: div.querySelector('.cloud-bubble'),
+    localBubble: div.querySelector('.local-bubble')
+  };
+}
+
+function startStream(model) {
+  const c   = document.getElementById('msgs');
+  const div = document.createElement('div');
+  div.className = 'msg assistant' + (model === 'local' ? ' local-assistant' : '');
+  const av = model === 'local' ? '🖥️' : '👨‍⚕️';
+  div.innerHTML = `
+    <div class="avatar">${av}</div>
+    <div>
+      <div class="bubble"><span class="cursor">▌</span></div>
+      <div class="msg-time">${now()}</div>
+    </div>`;
+  c.appendChild(div);
+  scrollMsgs();
+  return div.querySelector('.bubble');
+}
+
+function updateStream(el, text) {
+  el.innerHTML = fmt(text) + '<span class="cursor">▌</span>';
+  scrollMsgs();
+  scrollCompare();
+}
+
+function finalStream(el, text) {
+  el.innerHTML = fmt(text);
+}
+
+function showTyping() {
+  const c = document.getElementById('msgs');
+  const id = 'typ-' + Date.now();
+  const d  = document.createElement('div');
+  d.id = id; d.className = 'msg assistant';
+  d.innerHTML = `
+    <div class="avatar">👨‍⚕️</div>
+    <div class="bubble">
+      <div class="typing"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div>
+    </div>`;
+  c.appendChild(d);
+  scrollMsgs();
+  return id;
+}
+
+function removeTyping(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function scrollMsgs() {
+  const c = document.getElementById('msgs');
+  c.scrollTop = c.scrollHeight;
+}
+
+function scrollCompare() {
+  const c = document.getElementById('msgs-compare');
+  c.scrollTop = c.scrollHeight;
+}
+
+function now() {
+  return new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── MARKDOWN-LIKE FORMATTER ─────────────────────────────
+function fmt(text) {
+  if (!text) return '';
+
+  // Diagnosis block
+  if (text.includes('╔') || text.includes('MEDIZINISCHE EINSCHÄTZUNG') || text.includes('HAUPTDIAGNOSE')) {
+    text = text.replace(
+      /(╔[\s\S]*?━{10,}[\s\S]*?━{10,}[^\n]*)/g,
+      '<div class="diag-block">$1</div>'
+    );
+  }
+
+  // Emergency inline
+  text = text.replace(/(🚨[^\n]*)/g, '<div class="emerg-text">$1</div>');
+
+  // Bold / italic
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/\*(.+?)\*/g,     '<em>$1</em>');
+
+  // Bullet lists
+  const lines = text.split('\n');
+  const out   = [];
+  let inList   = false;
+
+  for (const line of lines) {
+    if (/^[\s]*[•·▸▶◦→\-]\s/.test(line)) {
+      if (!inList) { out.push('<ul>'); inList = true; }
+      out.push('<li>' + line.replace(/^[\s]*[•·▸▶◦→\-]\s/, '') + '</li>');
+    } else {
+      if (inList) { out.push('</ul>'); inList = false; }
+      out.push(line);
+    }
+  }
+  if (inList) out.push('</ul>');
+
+  text = out.join('\n');
+  text = text.replace(/\n\n/g, '<br><br>');
+  text = text.replace(/\n/g,   '<br>');
+
+  return text;
+}
+
+// ─── EMERGENCY DETECTION ─────────────────────────────────
+const EMERG_KW = [
+  'brustschmerz','herzinfarkt','schlaganfall','bewusstlos','atemnot',
+  'thunderclap','vernichtungskopfschmerz','anaphylaxie','sepsis',
+  'suizid','selbstverletzung','notaufnahme','notruf','112',
+  'aortendissektion','hodentorsion','ovarialtorsion','glaukomanfall','🚨'
+];
+
+function checkEmergency(text) {
+  const low = text.toLowerCase();
+  const hit = EMERG_KW.some(k => low.includes(k));
+  if (hit) {
+    document.getElementById('emergency-banner').style.display = 'block';
+    setStatus('🚨 NOTFALL erkannt!', 'emergency');
+  }
+}
+
+// ─── SIDEBAR UPDATES ─────────────────────────────────────
+function updateSidebar(text) {
+  if (text.includes('HAUPTDIAGNOSE') || text.includes('MEDIZINISCHE EINSCHÄTZUNG')) {
+    setStatus('✅ Diagnose gestellt', '');
+  } else if (text.includes('?')) {
+    setStatus('🔍 Anamnese läuft...', 'analyzing');
+  }
+
+  checkEmergency(text);
+
+  const found = new Set();
+  const patterns = [
+    /(?:Schmerzen?|Beschwerden?|leide unter|habe|klagt über|verspürt)\s+([\wäöüÄÖÜß\s-]{4,28})/gi,
+    /(?:Fieber|Husten|Übelkeit|Erbrechen|Schwindel|Müdigkeit|Kopfschmerz|Rückenschmerz|Bauchschmerz|Atemnot|Herzrasen|Ausschlag|Juckreiz)/gi
+  ];
+  for (const p of patterns) {
+    let m;
+    while ((m = p.exec(text)) !== null) {
+      const word = (m[1] || m[0]).trim().replace(/\s+/g,' ');
+      if (word.length > 3 && word.length < 30) found.add(word.charAt(0).toUpperCase() + word.slice(1));
+    }
+  }
+
+  if (found.size > 0) {
+    const el = document.getElementById('symptom-list');
+    const tags = [...found].slice(0, 8).map(s => `<span class="symptom-tag">${s}</span>`).join('');
+    el.innerHTML = tags;
+  }
+}
+
+function setStatus(label, cls) {
+  const b = document.getElementById('status-badge');
+  b.textContent = label;
+  b.className = 'status-badge' + (cls ? ' ' + cls : '');
+}
+
+// ─── NEW SESSION ─────────────────────────────────────────
+async function newSession() {
+  // Reset cloud session
+  await fetch('/api/reset', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ session_id: sessionId, model: 'cloud' })
+  }).catch(_=>{});
+
+  // Reset local session if in both mode
+  if (appMode === 'both') {
+    await fetch('/api/reset', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ session_id: sessionIdL, model: 'local' })
+    }).catch(_=>{});
+  }
+
+  sessionId  = uid();
+  sessionIdL = uid();
+  localStorage.setItem('med_sid',   sessionId);
+  localStorage.setItem('med_sid_l', sessionIdL);
+  isReadOnly = false;
+
+  document.getElementById('msgs').innerHTML = '';
+  document.getElementById('msgs-compare').innerHTML = '';
+  document.getElementById('emergency-banner').style.display = 'none';
+  document.getElementById('readonly-banner').style.display = 'none';
+  document.getElementById('symptom-list').innerHTML = '<div class="no-data">Noch keine Symptome erfasst</div>';
+  document.getElementById('msg-input').disabled = false;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('voice-btn').style.display = '';
+  setStatus('🔍 Anamnese läuft...', 'analyzing');
+  window.speechSynthesis && window.speechSynthesis.cancel();
+
+  greet();
+}
+
+// ─── PATIENT HISTORY ─────────────────────────────────────
+let knownPatients = [];
+
+async function onSaveNameInput() {
+  if (knownPatients.length === 0) {
+    try {
+      const r = await fetch('/api/patients');
+      if (r.ok) knownPatients = await r.json();
+    } catch(_){}
+  }
+  const dl = document.getElementById('patients-datalist');
+  dl.innerHTML = knownPatients.map(p => `<option value="${p.patient_name}">`).join('');
+}
+
+function openSaveModal() {
+  document.getElementById('save-name-input').value = '';
+  document.getElementById('save-status').textContent = '';
+  document.getElementById('save-status').className = '';
+  document.getElementById('modal-save').classList.add('show');
+  setTimeout(() => document.getElementById('save-name-input').focus(), 50);
+  onSaveNameInput();
+}
+
+async function doSave() {
+  const name = document.getElementById('save-name-input').value.trim();
+  const st   = document.getElementById('save-status');
+  if (!name) { st.textContent = 'Bitte einen Namen eingeben.'; st.className = 'err'; return; }
+
+  st.textContent = 'Speichert...'; st.className = '';
+
+  // In compare mode, save the cloud session (primary)
+  const model = (chatMode === 'compare' || chatMode === 'cloud') ? 'cloud' : 'local';
+  const sid   = (chatMode === 'local') ? sessionIdL : sessionId;
+
+  try {
+    const r = await fetch('/api/patients/save', {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ session_id: sid, patient_name: name, model })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Fehler');
+    st.textContent = '✅ Gespeichert!'; st.className = 'ok';
+    knownPatients = [];
+    setTimeout(() => closeModals(), 1200);
+  } catch(e) {
+    st.textContent = '❌ ' + e.message; st.className = 'err';
+  }
+}
+
+async function openPatientsModal() {
+  document.getElementById('modal-patients').classList.add('show');
+  await renderPatientsList();
+}
+
+async function renderPatientsList() {
+  const container = document.getElementById('patients-list-container');
+  container.innerHTML = '<div class="no-data">Lade...</div>';
+  try {
+    const r = await fetch('/api/patients');
+    if (!r.ok) throw new Error('Fehler');
+    const patients = await r.json();
+    knownPatients = patients;
+    if (patients.length === 0) {
+      container.innerHTML = '<div class="no-data">Keine gespeicherten Patienten.</div>';
+      return;
+    }
+    container.innerHTML = patients.map(p => {
+      const slug  = p.slug;
+      const chats = (p.chats || []).map(c => {
+        const date = new Date(c.saved_at).toLocaleString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        return `<div class="chat-row">
+          <span class="chat-label" title="${c.label}">${c.label}</span>
+          <span class="chat-date">${date}</span>
+          <div class="chat-actions">
+            <button class="icon-btn load" title="Laden" onclick="loadChat('${slug}','${c.chat_id}')">📂</button>
+            <button class="icon-btn del"  title="Löschen" onclick="deleteChat('${slug}','${c.chat_id}')">🗑</button>
+          </div>
+        </div>`;
+      }).join('');
+      return `<div class="patient-card" id="pc-${slug}">
+        <div class="patient-header" onclick="togglePatientCard('${slug}')">
+          <span class="patient-name">👤 ${p.patient_name}</span>
+          <span class="patient-count">${(p.chats||[]).length} Sitzung(en)</span>
+          <span class="patient-chevron">▶</span>
+          <button class="icon-btn del" style="margin-left:4px" title="Patient löschen"
+                  onclick="event.stopPropagation();deletePatient('${slug}')">🗑</button>
+        </div>
+        <div class="chat-list">${chats || '<div class="no-data" style="padding:10px">Keine Sitzungen.</div>'}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = '<div class="no-data" style="color:var(--red)">Fehler beim Laden.</div>';
+  }
+}
+
+function togglePatientCard(slug) {
+  const card = document.getElementById('pc-' + slug);
+  if (card) card.classList.toggle('open');
+}
+
+async function loadChat(slug, chatId) {
+  try {
+    const r = await fetch(`/api/patients/${slug}/chats/${chatId}`);
+    if (!r.ok) throw new Error('Fehler');
+    const data = await r.json();
+
+    sessionId = uid();
+    localStorage.setItem('med_sid', sessionId);
+    isReadOnly = true;
+
+    closeModals();
+
+    // Switch to single (cloud) view for archived chats
+    if (appMode === 'both') setChatMode('cloud');
+
+    const msgs = document.getElementById('msgs');
+    msgs.innerHTML = '';
+    document.getElementById('emergency-banner').style.display = 'none';
+    document.getElementById('readonly-banner').style.display = 'block';
+    document.getElementById('msg-input').disabled = true;
+    document.getElementById('send-btn').disabled = true;
+    document.getElementById('voice-btn').style.display = 'none';
+    setStatus('📂 Archiv', '');
+
+    for (const m of (data.messages || [])) {
+      if (m.role === 'user' || m.role === 'assistant') {
+        const content = Array.isArray(m.content)
+          ? m.content.map(b => b.text || '').join('')
+          : m.content;
+        addMsg(m.role, content);
+      }
+    }
+  } catch(e) {
+    alert('Fehler beim Laden: ' + e.message);
+  }
+}
+
+async function deleteChat(slug, chatId) {
+  if (!confirm('Diese Sitzung wirklich löschen?')) return;
+  try {
+    const r = await fetch(`/api/patients/${slug}/chats/${chatId}`, { method: 'DELETE' });
+    if (!r.ok) throw new Error('Fehler');
+    await renderPatientsList();
+  } catch(e) {
+    alert('Fehler beim Löschen: ' + e.message);
+  }
+}
+
+async function deletePatient(slug) {
+  if (!confirm('Gesamte Patientenakte löschen? Alle Sitzungen gehen verloren.')) return;
+  try {
+    const r = await fetch(`/api/patients/${slug}`, { method: 'DELETE' });
+    if (!r.ok) throw new Error('Fehler');
+    await renderPatientsList();
+  } catch(e) {
+    alert('Fehler beim Löschen: ' + e.message);
+  }
+}
+
+function closeModals() {
+  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show'));
+}
+
+// ─── LOCATION & EMERGENCY NUMBERS ────────────────────────
+const EMERGENCY = {
+  DE: {
+    flag: '🇩🇪', name: 'Deutschland',
+    numbers: [
+      { n:'112',           l:'Notruf',                        d:'Feuerwehr · Rettungsdienst',          cls:'emergency-card' },
+      { n:'110',           l:'Polizei',                       d:'Polizeinotruf',                        cls:'emergency-card' },
+      { n:'116 117',       l:'Ärztlicher Bereitschaftsdienst',d:'Kassenärztliche Vereinigung (24h)',    cls:'info-card' },
+      { n:'0800 111 0 111',l:'Telefonseelsorge',              d:'Kostenlos, 24h',                       cls:'info-card' },
+      { n:'19222',         l:'Krankentransport',              d:'Nicht lebensbedrohliche Fälle',        cls:'info-card' },
+    ],
+    regions: {
+      'Bayern':                { n:'(089) 55 17 71',   d:'KV Bayern Notdienst-Vermittlung' },
+      'Hamburg':               { n:'(040) 22 80 22',   d:'KV Hamburg Bereitschaftsdienst' },
+      'Berlin':                { n:'(030) 31 00 31',   d:'KV Berlin Notfalldienst' },
+      'Baden-Württemberg':     { n:'0 621 - 38 32 22', d:'KV BW Notdienst Mannheim/Region' },
+      'Nordrhein-Westfalen':   { n:'116 117',          d:'KV Nordrhein / KV Westfalen-Lippe' },
+      'Niedersachsen':         { n:'116 117',          d:'KV Niedersachsen Bereitschaftsdienst' },
+      'Hessen':                { n:'116 117',          d:'KV Hessen Notdienst' },
+      'Sachsen':               { n:'116 117',          d:'KV Sachsen Notfallvermittlung' },
+      'Rheinland-Pfalz':       { n:'116 117',          d:'KV RLP Bereitschaftsdienst' },
+      'Brandenburg':           { n:'116 117',          d:'KV Brandenburg Notdienst' },
+      'Thüringen':             { n:'116 117',          d:'KV Thüringen Notdienst' },
+      'Schleswig-Holstein':    { n:'116 117',          d:'KV SH Bereitschaftsdienst' },
+      'Mecklenburg-Vorpommern':{ n:'116 117',          d:'KV MV Notdienst' },
+      'Saarland':              { n:'116 117',          d:'KV Saarland Notdienst' },
+      'Sachsen-Anhalt':        { n:'116 117',          d:'KV Sachsen-Anhalt Notdienst' },
+      'Bremen':                { n:'(0421) 3 66 66',   d:'KV Bremen Notfalldienst' },
+    }
+  },
+  AT: {
+    flag: '🇦🇹', name: 'Österreich',
+    numbers: [
+      { n:'112', l:'Euronotruf',       d:'Allgemeiner Notruf',              cls:'emergency-card' },
+      { n:'144', l:'Rettung',          d:'Rettungsdienst',                  cls:'emergency-card' },
+      { n:'133', l:'Polizei',          d:'Polizeinotruf',                   cls:'emergency-card' },
+      { n:'122', l:'Feuerwehr',        d:'Feuerwehrnotruf',                 cls:'emergency-card' },
+      { n:'141', l:'Ärztenotdienst',   d:'Österreich-weit (Ärztekammer)',   cls:'info-card' },
+      { n:'142', l:'Telefonseelsorge', d:'Kostenlos, 24h',                  cls:'info-card' },
+      { n:'147', l:'Rat auf Draht',    d:'Kinder- & Jugendnotfallnummer',   cls:'info-card' },
+    ],
+    regions: {
+      'Wien':             { n:'141',              d:'Ärztenotdienst Wien – auch (01) 531 16' },
+      'Niederösterreich': { n:'141',              d:'Ärztenotdienst NÖ' },
+      'Oberösterreich':   { n:'141',              d:'Ärztenotdienst OÖ – Linz: (0732) 77 07' },
+      'Salzburg':         { n:'(0662) 87 12 00',  d:'Salzburger Ärztenotdienst' },
+      'Tirol':            { n:'(0512) 36 00 06',  d:'Ärztenotdienst Tirol (nachts/WE)' },
+      'Vorarlberg':       { n:'(05522) 200',      d:'Ärztenotdienst Vorarlberg' },
+      'Steiermark':       { n:'141',              d:'Ärztenotdienst Steiermark' },
+      'Kärnten':          { n:'141',              d:'Ärztenotdienst Kärnten – (0463) 141' },
+      'Burgenland':       { n:'141',              d:'Ärztenotdienst Burgenland' },
+    }
+  },
+  CH: {
+    flag: '🇨🇭', name: 'Schweiz',
+    numbers: [
+      { n:'112', l:'Euronotruf',        d:'Allgemeiner Notruf',           cls:'emergency-card' },
+      { n:'144', l:'Sanität',           d:'Sanitätsnotruf',               cls:'emergency-card' },
+      { n:'117', l:'Polizei',           d:'Polizeinotruf',                cls:'emergency-card' },
+      { n:'118', l:'Feuerwehr',         d:'Feuerwehrnotruf',              cls:'emergency-card' },
+      { n:'143', l:'Dargebotene Hand',  d:'Telefonseelsorge (kostenlos)', cls:'info-card' },
+      { n:'145', l:'Tox Info Suisse',   d:'Vergiftungsnotfälle, 24h',     cls:'info-card' },
+      { n:'0800 040 040', l:'Ärztlicher Notfalldienst', d:'Medizinischer Bereitschaftsdienst', cls:'info-card' },
+    ],
+    regions: {
+      'Zürich':       { n:'0800 33 66 55', d:'Ärztefon Zürich (nachts/WE)' },
+      'Bern':         { n:'(031) 311 11 11',d:'Berner Ärztlicher Notfalldienst' },
+      'Basel-Stadt':  { n:'(061) 261 15 15',d:'Ärztlicher Notfalldienst Basel' },
+      'Geneva':       { n:'(022) 748 49 50',d:'Service médical d\'urgence Genève' },
+      'Genf':         { n:'(022) 748 49 50',d:'Service médical d\'urgence Genève' },
+      'Vaud':         { n:'144',            d:'Urgences médicales Vaud' },
+    }
+  }
+};
+
+let detectedCountry = localStorage.getItem('med_country') || 'DE';
+let detectedRegion  = localStorage.getItem('med_region')  || '';
+
+async function detectLocation() {
+  const ts = parseInt(localStorage.getItem('med_loc_ts') || '0');
+  const hasCached = detectedCountry && Date.now() - ts < 86400000;
+
+  if (hasCached) {
+    // Bekannter Standort → sofort anzeigen
+    renderEmergencyNumbers();
+    return;
+  }
+
+  // Kein Cache → Ladeindikator zeigen, noch keine Nummern
+  _showEmergencyState('loading');
+
+  if (!navigator.geolocation) {
+    _showEmergencyState('manual');
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    async pos => {
+      try {
+        const { latitude: lat, longitude: lon } = pos.coords;
+        const r = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+          { headers: { 'Accept-Language': 'de' } }
+        );
+        const d = await r.json();
+        const addr = d.address || {};
+        const cc = (addr.country_code || 'de').toUpperCase();
+        detectedCountry = ['DE','AT','CH'].includes(cc) ? cc : 'DE';
+        detectedRegion  = addr.state || addr.county || '';
+        localStorage.setItem('med_country', detectedCountry);
+        localStorage.setItem('med_region',  detectedRegion);
+        localStorage.setItem('med_loc_ts',  Date.now().toString());
+        renderEmergencyNumbers();
+      } catch(_) {
+        // Nominatim-Fehler → manuelle Auswahl
+        _showEmergencyState('manual');
+      }
+    },
+    () => {
+      // Berechtigung verweigert oder Fehler → manuelle Auswahl
+      _showEmergencyState('manual');
+    },
+    { timeout: 8000 }
+  );
+}
+
+function _showEmergencyState(state) {
+  const h3   = document.getElementById('emergency-h3');
+  const list = document.getElementById('emergency-numbers-list');
+  if (state === 'loading') {
+    if (h3)   h3.innerHTML = 'Notfallnummern <span class="loc-tag">⏳ wird ermittelt…</span>';
+    if (list) list.innerHTML = '';
+  } else {
+    if (h3)   h3.innerHTML = 'Notfallnummern <span class="loc-tag" onclick="openLocationModal()" title="Land auswählen">🌍 Land auswählen ✎</span>';
+    if (list) list.innerHTML = `
+      <div style="text-align:center;padding:14px 8px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+          Standort nicht verfügbar oder verweigert.
+        </div>
+        <button onclick="openLocationModal()" style="padding:7px 14px;background:var(--primary);color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px">
+          🌍 Land manuell auswählen
+        </button>
+      </div>`;
+  }
+}
+
+function renderEmergencyNumbers() {
+  const data   = EMERGENCY[detectedCountry] || EMERGENCY['DE'];
+  const region = detectedRegion;
+
+  // Header aktualisieren
+  const h3 = document.getElementById('emergency-h3');
+  if (h3) {
+    const loc = region ? `${region}, ${data.name}` : data.name;
+    h3.innerHTML = `Notfallnummern <span class="loc-tag" onclick="openLocationModal()" title="Standort ändern">${data.flag} ${loc} ✎</span>`;
+  }
+
+  const list = document.getElementById('emergency-numbers-list');
+  if (!list) return;
+
+  let html = data.numbers.map(n =>
+    `<div class="${n.cls}"><strong>📞 ${n.n} — ${n.l}</strong>${n.d}</div>`
+  ).join('');
+
+  // Regionalen Notdienst suchen
+  if (region) {
+    const match = Object.entries(data.regions || {}).find(
+      ([k]) => region.toLowerCase().includes(k.toLowerCase())
+    );
+    if (match) {
+      const rd = match[1];
+      html += `<div class="regional-card"><strong>📍 ${rd.n} — Regionaler Notdienst</strong>${rd.d}</div>`;
+    }
+  }
+
+  list.innerHTML = html;
+}
+
+function openLocationModal() {
+  document.getElementById('loc-country').value = detectedCountry;
+  updateRegionDropdown();
+  setTimeout(() => { document.getElementById('loc-region').value = detectedRegion; }, 10);
+  document.getElementById('modal-location').classList.add('show');
+}
+
+function updateRegionDropdown() {
+  const cc   = document.getElementById('loc-country').value;
+  const data = EMERGENCY[cc] || EMERGENCY['DE'];
+  const sel  = document.getElementById('loc-region');
+  sel.innerHTML = '<option value="">— Bundesland / Kanton —</option>' +
+    Object.keys(data.regions || {}).map(r => `<option value="${r}">${r}</option>`).join('');
+}
+
+function saveLocationManual() {
+  detectedCountry = document.getElementById('loc-country').value;
+  detectedRegion  = document.getElementById('loc-region').value;
+  localStorage.setItem('med_country', detectedCountry);
+  localStorage.setItem('med_region',  detectedRegion);
+  localStorage.setItem('med_loc_ts',  Date.now().toString());
+  closeModals();
+  renderEmergencyNumbers();
+}
+
+// ─── HAUSARZT ─────────────────────────────────────────────
+function loadHausarzt() {
+  try { return JSON.parse(localStorage.getItem('med_hausarzt') || 'null'); }
+  catch(_) { return null; }
+}
+
+function renderHausarzt() {
+  const gp  = loadHausarzt();
+  const sec = document.getElementById('hausarzt-section');
+  if (!sec) return;
+  if (!gp) {
+    sec.innerHTML = '<button class="gp-add-btn" onclick="openHausarztModal()">➕ Hausarzt hinzufügen</button>';
+    return;
+  }
+  const q = encodeURIComponent(`${gp.name}${gp.address ? ' ' + gp.address : ' Arzt'}`);
+  sec.innerHTML = `<div class="gp-card">
+    <div class="gp-header">
+      <strong>👨‍⚕️ ${gp.name}</strong>
+      <button class="gp-edit-btn" onclick="openHausarztModal()" title="Bearbeiten">✎</button>
+    </div>
+    ${gp.specialty ? `<div class="gp-detail">🏥 ${gp.specialty}</div>` : ''}
+    ${gp.phone    ? `<a  class="gp-phone" href="tel:${gp.phone.replace(/\s/g,'')}">📞 ${gp.phone}</a>` : ''}
+    ${gp.address  ? `<div class="gp-detail">📍 ${gp.address}</div>` : ''}
+    <a class="gp-maps" href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank">🗺️ In Google Maps öffnen</a>
+  </div>`;
+}
+
+function openHausarztModal() {
+  const gp = loadHausarzt() || {};
+  document.getElementById('gp-name').value      = gp.name      || '';
+  document.getElementById('gp-specialty').value = gp.specialty || '';
+  document.getElementById('gp-phone').value     = gp.phone     || '';
+  document.getElementById('gp-address').value   = gp.address   || '';
+  document.getElementById('gp-del-btn').style.display = gp.name ? '' : 'none';
+  document.getElementById('modal-hausarzt').classList.add('show');
+  setTimeout(() => document.getElementById('gp-name').focus(), 50);
+}
+
+function saveHausarzt() {
+  const name = document.getElementById('gp-name').value.trim();
+  if (!name) { alert('Bitte einen Namen eingeben.'); return; }
+  localStorage.setItem('med_hausarzt', JSON.stringify({
+    name,
+    specialty: document.getElementById('gp-specialty').value.trim(),
+    phone:     document.getElementById('gp-phone').value.trim(),
+    address:   document.getElementById('gp-address').value.trim(),
+  }));
+  closeModals();
+  renderHausarzt();
+}
+
+function deleteHausarzt() {
+  if (!confirm('Hausarzt-Eintrag wirklich löschen?')) return;
+  localStorage.removeItem('med_hausarzt');
+  closeModals();
+  renderHausarzt();
+}
+
+// ─── AUTO-HISTORY ─────────────────────────────────────────
+async function openAutoHistoryModal() {
+  document.getElementById('modal-auto-history').classList.add('show');
+  await renderAutoHistory();
+}
+
+async function renderAutoHistory() {
+  const container = document.getElementById('auto-history-container');
+  container.innerHTML = '<div class="no-data">Lade...</div>';
+  try {
+    const r = await fetch('/api/auto-history');
+    if (!r.ok) throw new Error();
+    const entries = await r.json();
+    if (entries.length === 0) {
+      container.innerHTML = '<div class="no-data">Noch keine automatisch gespeicherten Sitzungen.<br>Starten Sie ein Gespräch – es wird automatisch gespeichert.</div>';
+      return;
+    }
+    container.innerHTML = entries.map(e => {
+      const date = new Date(e.saved_at).toLocaleString('de-DE', {
+        day:'2-digit', month:'2-digit', year:'numeric',
+        hour:'2-digit', minute:'2-digit'
+      });
+      const modelClass = e.model === 'local' ? 'local' : 'cloud';
+      const modelLabel = e.model === 'local' ? '💻 Lokal' : '☁️ Cloud';
+      return `<div class="ah-entry" onclick="loadAutoHistory('${e.id}')">
+        <span class="ah-model-badge ${modelClass}">${modelLabel}</span>
+        <span class="ah-label" title="${e.label}">${e.label}</span>
+        <span class="ah-date">${date}</span>
+        <button class="ah-del" title="Löschen" onclick="event.stopPropagation();deleteAutoHistory('${e.id}')">🗑</button>
+      </div>`;
+    }).join('');
+  } catch(_) {
+    container.innerHTML = '<div class="no-data" style="color:var(--red)">Fehler beim Laden.</div>';
+  }
+}
+
+async function loadAutoHistory(entryId) {
+  try {
+    const r = await fetch(`/api/auto-history/${entryId}`);
+    if (!r.ok) throw new Error('Fehler');
+    const data = await r.json();
+
+    sessionId = uid();
+    localStorage.setItem('med_sid', sessionId);
+    isReadOnly = true;
+
+    closeModals();
+    if (appMode === 'both') setChatMode('cloud');
+
+    const msgs = document.getElementById('msgs');
+    msgs.innerHTML = '';
+    document.getElementById('emergency-banner').style.display = 'none';
+    document.getElementById('readonly-banner').style.display = 'block';
+    document.getElementById('msg-input').disabled = true;
+    document.getElementById('send-btn').disabled = true;
+    document.getElementById('voice-btn').style.display = 'none';
+    setStatus('🕐 Autoverlauf', '');
+
+    for (const m of (data.messages || [])) {
+      if (m.role === 'user' || m.role === 'assistant') {
+        const content = Array.isArray(m.content)
+          ? m.content.map(b => b.text || '').join('')
+          : m.content;
+        addMsg(m.role, content);
+      }
+    }
+  } catch(e) {
+    alert('Fehler beim Laden: ' + e.message);
+  }
+}
+
+async function deleteAutoHistory(entryId) {
+  try {
+    await fetch(`/api/auto-history/${entryId}`, { method: 'DELETE' });
+    await renderAutoHistory();
+  } catch(_) {}
+}
+</script>
+</body>
+</html>

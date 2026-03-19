@@ -1,0 +1,6 @@
+{
+  "version_url":   "https://raw.githubusercontent.com/AngoraElchkuh/medassist-ai/main/version.txt",
+  "download_url":  "https://github.com/AngoraElchkuh/medassist-ai/archive/refs/heads/main.zip",
+  "zip_prefix":    "medassist-ai-main/",
+  "changelog_url": "https://raw.githubusercontent.com/AngoraElchkuh/medassist-ai/main/CHANGELOG.md"
+}
