@@ -813,6 +813,30 @@
   .cmp-legend-dot.cloud { background: var(--primary); }
   .cmp-legend-dot.local { background: var(--local); }
 
+  /* ─── VORLESEN-BUTTON ─── */
+  .msg-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 3px;
+  }
+  .speak-msg-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity .2s, background .15s;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .msg:hover .speak-msg-btn { opacity: 0.7; }
+  .speak-msg-btn:hover { opacity: 1 !important; background: var(--primary-light); color: var(--primary); }
+  .speak-msg-btn.speaking { opacity: 1 !important; color: var(--red); }
+
   /* ─── SCROLLBAR ─── */
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -1197,18 +1221,92 @@ function toggleTTS() {
   else            { b.classList.remove('active'); b.title = 'Sprachausgabe aktivieren'; window.speechSynthesis.cancel(); }
 }
 
+// Beste verfügbare deutsche Stimme auswählen (Natural/Neural bevorzugt)
+function _bestDeVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  const de = voices.filter(v => v.lang.startsWith('de'));
+  if (!de.length) return null;
+  // Priorität: Online Natural > Online > lokal Natural > lokal
+  return (
+    de.find(v => /natural/i.test(v.name) && v.localService === false) ||
+    de.find(v => /online/i.test(v.name) && v.localService === false)  ||
+    de.find(v => /natural|neural/i.test(v.name))                      ||
+    de.find(v => /Conrad|Katja|Hedda/i.test(v.name))                  ||
+    de[0]
+  );
+}
+
+function _cleanForSpeech(text) {
+  return text
+    .replace(/[╔╚║╝═━▸□✓•🔍📌🔄💊⚠️🔴🚨📞ℹ️]/g, '')
+    .replace(/\*\*/g, '').replace(/\*/g, '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\n+/g, '. ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function speak(text) {
   if (!ttsEnabled || !window.speechSynthesis) return;
-  const clean = text.replace(/[╔╚║╝═━▸□✓•🔍📌🔄💊⚠️🔴🚨📞ℹ️]/g, '')
-                    .replace(/\*\*/g,'').replace(/\*/g,'')
-                    .replace(/<[^>]*>/g,'')
-                    .replace(/\n+/g,' ')
-                    .trim()
-                    .substring(0, 500);
-  const utt = new SpeechSynthesisUtterance(clean);
+  const utt = new SpeechSynthesisUtterance(_cleanForSpeech(text));
   utt.lang = 'de-DE';
   utt.rate = 1.0;
   window.speechSynthesis.speak(utt);
+}
+
+function speakMsg(btn) {
+  if (!window.speechSynthesis) { alert('Ihr Browser unterstützt keine Sprachausgabe.'); return; }
+
+  // Läuft gerade → stoppen
+  if (btn.classList.contains('speaking')) {
+    window.speechSynthesis.cancel();
+    btn.classList.remove('speaking');
+    btn.textContent = '🔊';
+    btn.title = 'Vorlesen';
+    return;
+  }
+
+  // Alle anderen Buttons zurücksetzen
+  document.querySelectorAll('.speak-msg-btn.speaking').forEach(b => {
+    b.classList.remove('speaking'); b.textContent = '🔊'; b.title = 'Vorlesen';
+  });
+
+  const bubble = btn.closest('.msg-footer').previousElementSibling;
+  const text   = _cleanForSpeech(bubble ? (bubble.innerText || bubble.textContent) : '');
+  if (!text) return;
+
+  btn.classList.add('speaking');
+  btn.textContent = '⏹';
+  btn.title = 'Stoppen';
+
+  const doSpeak = () => {
+    const utt   = new SpeechSynthesisUtterance(text);
+    utt.lang    = 'de-DE';
+    utt.rate    = 0.95;
+    // Stimmen können asynchron geladen werden
+    const trySpeak = () => {
+      const voices  = window.speechSynthesis.getVoices();
+      const deVoice = voices.find(v => v.lang.startsWith('de'));
+      if (deVoice) utt.voice = deVoice;
+      utt.onend   = () => { btn.classList.remove('speaking'); btn.textContent = '🔊'; btn.title = 'Vorlesen'; };
+      utt.onerror = () => { btn.classList.remove('speaking'); btn.textContent = '🔊'; };
+      window.speechSynthesis.speak(utt);
+    };
+    if (window.speechSynthesis.getVoices().length > 0) {
+      trySpeak();
+    } else {
+      window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.onvoiceschanged = null; trySpeak(); };
+      trySpeak(); // auch ohne Stimmen starten (Fallback-Stimme)
+    }
+  };
+
+  // Timeout nur wenn gerade etwas spielt – direkt aufrufen erhält User-Gesture-Kontext
+  if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+    window.speechSynthesis.cancel();
+    setTimeout(doSpeak, 150);
+  } else {
+    doSpeak();
+  }
 }
 
 // ─── INPUT HELPERS ───────────────────────────────────────
@@ -1357,11 +1455,18 @@ function addMsg(role, content) {
     ? (chatMode === 'local' ? '🖥️' : '👨‍⚕️')
     : '👤';
 
+  const speakBtn = role === 'assistant'
+    ? `<button class="speak-msg-btn" onclick="speakMsg(this)" title="Vorlesen">🔊</button>`
+    : '';
+
   div.innerHTML = `
     <div class="avatar">${av}</div>
     <div>
       <div class="bubble">${fmt(content)}</div>
-      <div class="msg-time">${t}</div>
+      <div class="msg-footer">
+        <div class="msg-time">${t}</div>
+        ${speakBtn}
+      </div>
     </div>`;
 
   c.appendChild(div);
@@ -1437,7 +1542,10 @@ function startStream(model) {
     <div class="avatar">${av}</div>
     <div>
       <div class="bubble"><span class="cursor">▌</span></div>
-      <div class="msg-time">${now()}</div>
+      <div class="msg-footer">
+        <div class="msg-time">${now()}</div>
+        <button class="speak-msg-btn" onclick="speakMsg(this)" title="Vorlesen" style="display:none">🔊</button>
+      </div>
     </div>`;
   c.appendChild(div);
   scrollMsgs();
@@ -1452,6 +1560,8 @@ function updateStream(el, text) {
 
 function finalStream(el, text) {
   el.innerHTML = fmt(text);
+  const btn = el.parentElement.querySelector('.speak-msg-btn');
+  if (btn) btn.style.display = '';
 }
 
 function showTyping() {

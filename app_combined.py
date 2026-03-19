@@ -215,7 +215,10 @@ def _prep_session(store: dict, sid: str, message: str):
 @app.get("/", response_class=HTMLResponse)
 async def root():
     tpl = Path(__file__).parent / "templates" / "index.html"
-    return HTMLResponse(content=tpl.read_text(encoding="utf-8"))
+    return HTMLResponse(
+        content=tpl.read_text(encoding="utf-8"),
+        headers={"Cache-Control": "no-store"},
+    )
 
 @app.get("/api/config")
 async def get_config():

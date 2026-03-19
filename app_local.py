@@ -213,7 +213,10 @@ class SaveRequest(BaseModel):
 @app.get("/", response_class=HTMLResponse)
 async def root():
     template_path = Path(__file__).parent / "templates" / "index.html"
-    return HTMLResponse(content=template_path.read_text(encoding="utf-8"))
+    return HTMLResponse(
+        content=template_path.read_text(encoding="utf-8"),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.post("/api/chat")
