@@ -115,6 +115,10 @@ class ResetRequest(BaseModel):
     session_id: str
     model: str = "cloud"   # "cloud" | "local" | "both"
 
+class RestoreRequest(BaseModel):
+    session_id: str
+    messages: list
+
 class SaveRequest(BaseModel):
     session_id: str
     patient_name: str
@@ -331,6 +335,18 @@ async def chat_compare(request: CompareRequest):
         generate(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/api/restore-session")
+async def restore_session(req: RestoreRequest):
+    restored = [
+        {"role": m["role"], "content": m["content"]}
+        for m in req.messages
+        if m.get("role") in ("user", "assistant")
+    ]
+    cloud_sessions[req.session_id] = list(restored)
+    local_sessions[req.session_id] = list(restored)
+    return {"status": "ok", "count": len(restored)}
 
 
 @app.post("/api/reset")

@@ -582,7 +582,8 @@
     color: var(--muted);
   }
   #voice-btn:hover { background: var(--primary-light); color: var(--primary); }
-  #voice-btn.rec   { background: var(--red); color: white; animation: recPulse 1s infinite; }
+  #voice-btn.rec    { background: var(--red); color: white; animation: recPulse 1s infinite; }
+  #voice-btn.paused { background: #f57c00; color: white; }
   @keyframes recPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
 
   #send-btn {
@@ -759,6 +760,13 @@
     font-weight: 500;
     flex-shrink: 0;
   }
+  #continue-btn {
+    background: var(--primary) !important;
+    color: white !important;
+    border-color: var(--primary) !important;
+  }
+  #continue-btn:hover { background: var(--primary-dark) !important; }
+
   #readonly-banner button {
     margin-left: 12px;
     padding: 3px 10px;
@@ -835,7 +843,36 @@
   }
   .msg:hover .speak-msg-btn { opacity: 0.7; }
   .speak-msg-btn:hover { opacity: 1 !important; background: var(--primary-light); color: var(--primary); }
-  .speak-msg-btn.speaking { opacity: 1 !important; color: var(--red); }
+  .speak-msg-btn.speaking {
+    opacity: 1 !important;
+    color: var(--red);
+    animation: tts-pulse 1s ease-in-out infinite;
+  }
+  @keyframes tts-pulse {
+    0%, 100% { transform: scale(1);    opacity: 1;   }
+    50%       { transform: scale(1.25); opacity: 0.6; }
+  }
+
+  /* ─── TTS-FORTSCHRITTSBALKEN ─── */
+  .tts-progress {
+    height: 5px;
+    background: var(--border);
+    border-radius: 3px;
+    margin: 5px 0 2px 0;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: height .15s;
+  }
+  .tts-progress:hover { height: 8px; }
+  .tts-progress-fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 3px;
+    width: 0%;
+    transition: width .12s linear;
+    pointer-events: none;
+  }
 
   /* ─── SCROLLBAR ─── */
   ::-webkit-scrollbar { width: 5px; }
@@ -932,8 +969,9 @@
   <div class="chat-area">
 
     <div id="readonly-banner">
-      📂 Archivierte Sitzung — Schreibgeschützt
-      <button onclick="newSession()">Neue Sitzung starten</button>
+      <span id="readonly-label">📂 Archivierte Sitzung</span>
+      <button id="continue-btn" onclick="continueSession()">▶ Sitzung fortführen</button>
+      <button onclick="newSession()">Neue Sitzung</button>
     </div>
 
     <div id="emergency-banner">
@@ -949,7 +987,7 @@
     <!-- INPUT -->
     <div class="input-area">
       <div id="voice-status-bar">
-        <span>🎤</span> Aufnahme läuft — sprechen Sie Ihre Beschwerden...
+        <span id="voice-status-icon">🎤</span> <span id="voice-status-text">Aufnahme läuft — sprechen Sie Ihre Beschwerden...</span>
       </div>
 
       <div class="input-box">
@@ -1064,9 +1102,12 @@ localStorage.setItem('med_sid_l', sessionIdL);
 let appMode   = 'cloud';   // "cloud" | "local" | "both"  — from /api/config
 let chatMode  = 'cloud';   // "cloud" | "local" | "compare"
 
-let isReadOnly  = false;
-let isRecording = false;
+let isReadOnly       = false;
+let _loadedMessages  = []; // Nachrichten der geladenen Archiv-Sitzung
+let isRecording  = false;
+let recPaused    = false;
 let recognition  = null;
+let _sttFinal    = ''; // akkumulierter finaler Text der aktuellen Aufnahme
 let ttsEnabled   = false;
 
 // ─── INIT ────────────────────────────────────────────────
@@ -1173,43 +1214,95 @@ function initSTT() {
 
   recognition = new SR();
   recognition.lang = 'de-DE';
-  recognition.continuous = false;
+  recognition.continuous     = true;  // Aufnahme läuft durch Sprechpausen hindurch
   recognition.interimResults = true;
 
   recognition.onresult = e => {
-    let t = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) _sttFinal += e.results[i][0].transcript + ' ';
+      else interim += e.results[i][0].transcript;
+    }
+    let t = _sttFinal + interim;
     const el = document.getElementById('msg-input');
     el.value = t;
     autoResize(el);
   };
 
   recognition.onend = () => {
-    stopRec();
-    const el = document.getElementById('msg-input');
-    if (el.value.trim()) onSend();
+    if (isRecording) {
+      // Sprechpause oder Browser-Timeout → sofort neu starten
+      try { recognition.start(); } catch(e) { stopRec(); }
+    } else {
+      // Manuell gestoppt → finalen Text bereinigen (keine eckigen Klammern)
+      const el = document.getElementById('msg-input');
+      el.value = _sttFinal.trim();
+      autoResize(el);
+      _sttFinal = '';
+    }
   };
 
-  recognition.onerror = () => stopRec();
+  recognition.onerror = (e) => {
+    if (e.error === 'no-speech') return; // Stille ist kein Fehler
+    stopRec();
+    _sttFinal = '';
+  };
 }
 
 function toggleVoice() {
   if (!recognition) return;
-  if (isRecording) { recognition.stop(); stopRec(); }
-  else { startRec(); try { recognition.start(); } catch(e){ stopRec(); } }
+  if (isRecording) {
+    // Aufnahme läuft → pausieren (Text bleibt erhalten)
+    pauseRec();
+    recognition.stop();
+  } else if (recPaused) {
+    // Pausiert → weiter aufnehmen
+    resumeRec();
+    try { recognition.start(); } catch(e) { stopRec(); }
+  } else {
+    // Idle → neu starten
+    _sttFinal = '';
+    startRec();
+    try { recognition.start(); } catch(e) { stopRec(); }
+  }
+}
+
+function _setVoiceBar(icon, text) {
+  document.getElementById('voice-status-icon').textContent = icon;
+  document.getElementById('voice-status-text').textContent = text;
 }
 
 function startRec() {
-  isRecording = true;
+  isRecording = true; recPaused = false;
   const b = document.getElementById('voice-btn');
-  b.classList.add('rec'); b.textContent = '⏹';
+  b.className = b.className.replace(/\brec\b|\bpaused\b/g, '').trim();
+  b.classList.add('rec'); b.textContent = '⏸';
+  b.title = 'Aufnahme pausieren';
+  _setVoiceBar('🎤', 'Aufnahme läuft — sprechen Sie Ihre Beschwerden...');
   document.getElementById('voice-status-bar').classList.add('show');
 }
 
-function stopRec() {
-  isRecording = false;
+function pauseRec() {
+  isRecording = false; recPaused = true;
   const b = document.getElementById('voice-btn');
-  b.classList.remove('rec'); b.textContent = '🎤';
+  b.classList.remove('rec'); b.classList.add('paused');
+  b.textContent = '▶'; b.title = 'Aufnahme fortsetzen';
+  _setVoiceBar('⏸', 'Pausiert — ▶ drücken zum Weitersprechen');
+}
+
+function resumeRec() {
+  isRecording = true; recPaused = false;
+  const b = document.getElementById('voice-btn');
+  b.classList.remove('paused'); b.classList.add('rec');
+  b.textContent = '⏸'; b.title = 'Aufnahme pausieren';
+  _setVoiceBar('🎤', 'Aufnahme läuft — sprechen Sie weiter...');
+}
+
+function stopRec() {
+  isRecording = false; recPaused = false;
+  const b = document.getElementById('voice-btn');
+  b.classList.remove('rec', 'paused'); b.textContent = '🎤';
+  b.title = 'Spracheingabe';
   document.getElementById('voice-status-bar').classList.remove('show');
 }
 
@@ -1256,57 +1349,104 @@ function speak(text) {
   window.speechSynthesis.speak(utt);
 }
 
-function speakMsg(btn) {
-  if (!window.speechSynthesis) { alert('Ihr Browser unterstützt keine Sprachausgabe.'); return; }
+// ─── PER-MESSAGE TTS ENGINE ───────────────────────────────
+let _tts = { text: '', btn: null, bar: null, charIndex: 0 };
 
-  // Läuft gerade → stoppen
-  if (btn.classList.contains('speaking')) {
-    window.speechSynthesis.cancel();
-    btn.classList.remove('speaking');
-    btn.textContent = '🔊';
-    btn.title = 'Vorlesen';
-    return;
+function _ttsClear() {
+  window.speechSynthesis.cancel();
+  if (_tts.btn) {
+    _tts.btn.classList.remove('speaking');
+    _tts.btn.textContent = '🔊';
+    _tts.btn.title = 'Vorlesen';
   }
+  if (_tts.bar) {
+    _tts.bar.style.display = 'none';
+    _tts.bar.querySelector('.tts-progress-fill').style.width = '0%';
+  }
+  _tts = { text: '', btn: null, bar: null, charIndex: 0 };
+}
 
-  // Alle anderen Buttons zurücksetzen
-  document.querySelectorAll('.speak-msg-btn.speaking').forEach(b => {
-    b.classList.remove('speaking'); b.textContent = '🔊'; b.title = 'Vorlesen';
-  });
-
-  const bubble = btn.closest('.msg-footer').previousElementSibling;
-  const text   = _cleanForSpeech(bubble ? (bubble.innerText || bubble.textContent) : '');
-  if (!text) return;
-
+function _startTTS(fromChar) {
+  const { text, btn, bar } = _tts;
   btn.classList.add('speaking');
   btn.textContent = '⏹';
   btn.title = 'Stoppen';
+  if (bar) bar.style.display = 'block';
 
-  const doSpeak = () => {
-    const utt   = new SpeechSynthesisUtterance(text);
-    utt.lang    = 'de-DE';
-    utt.rate    = 0.95;
-    const trySpeak = () => {
-      const v = _bestDeVoice();
-      if (v) utt.voice = v;
-      utt.onend   = () => { btn.classList.remove('speaking'); btn.textContent = '🔊'; btn.title = 'Vorlesen'; };
-      utt.onerror = () => { btn.classList.remove('speaking'); btn.textContent = '🔊'; };
-      window.speechSynthesis.speak(utt);
+  const go = () => {
+    const utt = new SpeechSynthesisUtterance(text.substring(fromChar));
+    utt.lang  = 'de-DE';
+    utt.rate  = 0.95;
+    const v   = _bestDeVoice();
+    if (v) utt.voice = v;
+
+    _tts._utt = utt; // aktuelle Utterance merken für Seek-Erkennung
+    utt.onboundary = (e) => {
+      if (e.name !== 'word' || !bar) return;
+      _tts.charIndex = fromChar + e.charIndex;
+      bar.querySelector('.tts-progress-fill').style.width =
+        ((_tts.charIndex / text.length) * 100).toFixed(1) + '%';
     };
-    if (window.speechSynthesis.getVoices().length > 0) {
-      trySpeak();
-    } else {
-      window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.onvoiceschanged = null; trySpeak(); };
-      trySpeak();
-    }
+    utt.onend = utt.onerror = () => {
+      // Nur aufräumen wenn kein Seek aktiv (Seek ersetzt _tts._utt)
+      if (btn === _tts.btn && utt === _tts._utt) _ttsClear();
+    };
+    window.speechSynthesis.speak(utt);
   };
 
-  // Timeout nur wenn gerade etwas spielt – direkt aufrufen erhält User-Gesture-Kontext
-  if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
-    window.speechSynthesis.cancel();
-    setTimeout(doSpeak, 150);
+  if (window.speechSynthesis.getVoices().length > 0) {
+    go();
   } else {
-    doSpeak();
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.onvoiceschanged = null; go();
+    };
+    go();
   }
+}
+
+function speakMsg(btn) {
+  if (!window.speechSynthesis) { alert('Ihr Browser unterstützt keine Sprachausgabe.'); return; }
+
+  // Läuft gerade: stoppen
+  if (btn === _tts.btn) { _ttsClear(); return; }
+
+  // Anderes TTS läuft: erst stoppen, dann kurz warten
+  const wasRunning = window.speechSynthesis.speaking || window.speechSynthesis.pending;
+  _ttsClear();
+
+  const wrapper = btn.closest('.msg-footer').parentElement;
+  const bubble  = wrapper.querySelector('.bubble');
+  const text    = _cleanForSpeech(bubble ? (bubble.innerText || bubble.textContent) : '');
+  if (!text) return;
+
+  const bar = wrapper.querySelector('.tts-progress');
+  _tts = { text, btn, bar, charIndex: 0 };
+
+  if (wasRunning) {
+    setTimeout(() => _startTTS(0), 150);
+  } else {
+    _startTTS(0);
+  }
+}
+
+function _ttsSeek(e) {
+  if (!_tts.text || !_tts.btn) return;
+  e.stopPropagation();
+  const bar  = e.currentTarget;
+  const rect = bar.getBoundingClientRect();
+  const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  let   ci   = Math.floor(pct * _tts.text.length);
+  // Zum nächsten Satzanfang springen
+  const prev = _tts.text.lastIndexOf('. ', ci);
+  if (prev >= 0 && ci - prev < 200) ci = prev + 2;
+
+  bar.querySelector('.tts-progress-fill').style.width = (pct * 100).toFixed(1) + '%';
+
+  // State retten: cancel() feuert onerror → _ttsClear() würde sonst _tts nullen
+  const saved = { ..._tts };
+  window.speechSynthesis.cancel();
+  _tts = { ...saved, charIndex: ci }; // State sofort wiederherstellen
+  setTimeout(() => _startTTS(ci), 150);
 }
 
 // ─── INPUT HELPERS ───────────────────────────────────────
@@ -1320,6 +1460,12 @@ function onKey(e) {
 }
 
 function onSend() {
+  // Aufnahme stoppen falls aktiv oder pausiert
+  if (isRecording || recPaused) {
+    if (isRecording) { try { recognition.stop(); } catch(e) {} }
+    stopRec();
+    _sttFinal = '';
+  }
   if (chatMode === 'compare') sendMsgCompare();
   else sendMsg();
 }
@@ -1459,6 +1605,10 @@ function addMsg(role, content) {
     ? `<button class="speak-msg-btn" onclick="speakMsg(this)" title="Vorlesen">🔊</button>`
     : '';
 
+  const progressBar = role === 'assistant'
+    ? `<div class="tts-progress" style="display:none" onclick="_ttsSeek(event)"><div class="tts-progress-fill"></div></div>`
+    : '';
+
   div.innerHTML = `
     <div class="avatar">${av}</div>
     <div>
@@ -1467,6 +1617,7 @@ function addMsg(role, content) {
         <div class="msg-time">${t}</div>
         ${speakBtn}
       </div>
+      ${progressBar}
     </div>`;
 
   c.appendChild(div);
@@ -1546,6 +1697,7 @@ function startStream(model) {
         <div class="msg-time">${now()}</div>
         <button class="speak-msg-btn" onclick="speakMsg(this)" title="Vorlesen" style="display:none">🔊</button>
       </div>
+      <div class="tts-progress" style="display:none" onclick="_ttsSeek(event)"><div class="tts-progress-fill"></div></div>
     </div>`;
   c.appendChild(div);
   scrollMsgs();
@@ -1860,11 +2012,13 @@ async function loadChat(slug, chatId) {
     document.getElementById('voice-btn').style.display = 'none';
     setStatus('📂 Archiv', '');
 
+    _loadedMessages = [];
     for (const m of (data.messages || [])) {
       if (m.role === 'user' || m.role === 'assistant') {
         const content = Array.isArray(m.content)
           ? m.content.map(b => b.text || '').join('')
           : m.content;
+        _loadedMessages.push({ role: m.role, content });
         addMsg(m.role, content);
       }
     }
@@ -2218,16 +2372,40 @@ async function loadAutoHistory(entryId) {
     document.getElementById('voice-btn').style.display = 'none';
     setStatus('🕐 Autoverlauf', '');
 
+    _loadedMessages = [];
     for (const m of (data.messages || [])) {
       if (m.role === 'user' || m.role === 'assistant') {
         const content = Array.isArray(m.content)
           ? m.content.map(b => b.text || '').join('')
           : m.content;
+        _loadedMessages.push({ role: m.role, content });
         addMsg(m.role, content);
       }
     }
   } catch(e) {
     alert('Fehler beim Laden: ' + e.message);
+  }
+}
+
+async function continueSession() {
+  if (!_loadedMessages.length) return;
+  try {
+    const r = await fetch('/api/restore-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, messages: _loadedMessages })
+    });
+    if (!r.ok) throw new Error('Server-Fehler');
+
+    isReadOnly = false;
+    document.getElementById('msg-input').disabled = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('voice-btn').style.display = '';
+    document.getElementById('readonly-label').textContent = '📂 Archiv-Sitzung wird fortgeführt';
+    document.getElementById('continue-btn').style.display = 'none';
+    setStatus('📂 Fortgeführt — Anamnese läuft...', 'analyzing');
+  } catch(e) {
+    alert('Fehler beim Fortführen: ' + e.message);
   }
 }
 

@@ -204,6 +204,10 @@ class ChatRequest(BaseModel):
 class ResetRequest(BaseModel):
     session_id: str
 
+class RestoreRequest(BaseModel):
+    session_id: str
+    messages: list
+
 class SaveRequest(BaseModel):
     session_id: str
     patient_name: str
@@ -270,6 +274,16 @@ async def chat(request: ChatRequest):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/api/restore-session")
+async def restore_session(req: RestoreRequest):
+    sessions[req.session_id] = [
+        {"role": m["role"], "content": m["content"]}
+        for m in req.messages
+        if m.get("role") in ("user", "assistant")
+    ]
+    return {"status": "ok", "count": len(sessions[req.session_id])}
 
 
 @app.post("/api/reset")
